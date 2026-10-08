@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Cem Tetris</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cem Tetris">
+<meta name="theme-color" content="#1b1442">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<style>
+  html, body { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; background: #1b1442; }
+  body {
+    position: fixed; inset: 0;
+    font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", system-ui, -apple-system, sans-serif;
+    color: #fff;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    background: radial-gradient(circle at 50% 0%, #4a2a9a 0%, #1b1442 60%, #0f0a2a 100%);
+  }
+  button { font: inherit; color: inherit; border: 0; cursor: pointer; touch-action: manipulation; }
+  #app {
+    height: 100%; max-width: 560px; margin: 0 auto; box-sizing: border-box;
+    display: flex; flex-direction: column; gap: 8px;
+    padding: calc(env(safe-area-inset-top) + 8px) 12px calc(env(safe-area-inset-bottom) + 10px);
+  }
+
+  /* ---- Üst bar ---- */
+  #top { display: flex; align-items: center; gap: 8px; flex: none; }
+  #mascot { position: relative; width: 72px; height: 72px; flex: none; }
+  #face { width: 100%; height: 100%; border-radius: 50%; background: rgba(255,255,255,.12);
+          box-shadow: 0 0 0 3px rgba(255,255,255,.35); overflow: hidden; }
+  #face svg, #face img { width: 100%; height: 100%; display: block; object-fit: cover; }
+  #badge { position: absolute; right: -4px; bottom: -4px; font-size: 22px; line-height: 1; }
+  #mascot.mood-happy, #mascot.mood-cheer { animation: bounce .45s ease-in-out 3; }
+  #mascot.mood-wow { animation: jump .5s ease-out 1; }
+  #mascot.mood-worried { animation: shake .35s linear 4; }
+  @keyframes bounce { 50% { transform: translateY(-8px) scale(1.06); } }
+  @keyframes jump { 40% { transform: translateY(-14px) scale(1.12); } }
+  @keyframes shake { 25% { transform: translateX(-4px) rotate(-4deg); } 75% { transform: translateX(4px) rotate(4deg); } }
+
+  #stats { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; min-width: 0; }
+  .stat { background: rgba(255,255,255,.1); border-radius: 12px; padding: 5px 4px; text-align: center; min-width: 0; }
+  .stat small { display: block; font-size: 10px; letter-spacing: .06em; opacity: .75; }
+  .stat b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+  #hi { grid-column: 1 / 4; display: flex; justify-content: space-between; align-items: center; padding: 3px 10px; }
+  #hi small { display: inline; } #hi b { display: inline; font-size: 14px; }
+  #nextWrap { flex: none; width: 72px; height: 72px; background: rgba(255,255,255,.1); border-radius: 14px; display: grid; place-items: center; }
+  #pauseBtn { flex: none; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.15); font-size: 18px; }
+
+  /* ---- Tahta ---- */
+  #boardWrap { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; }
+  #board { touch-action: none; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.45), 0 0 0 3px rgba(255,255,255,.18); }
+  #bubble {
+    position: absolute; left: 4px; top: 4px; max-width: 70%; padding: 6px 12px; border-radius: 16px;
+    background: #fff; color: #2a1d6a; font-weight: 800; font-size: 16px; pointer-events: none;
+    opacity: 0; transform: translateY(-6px) scale(.9); transition: .2s; z-index: 3;
+  }
+  #bubble.show { opacity: 1; transform: none; }
+  #toast {
+    position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); z-index: 3;
+    font-size: 34px; font-weight: 900; text-align: center; pointer-events: none; opacity: 0;
+    text-shadow: 0 3px 0 #7a3cff, 0 6px 18px rgba(0,0,0,.5); white-space: nowrap;
+  }
+  #toast.show { animation: pop 1.2s ease-out; }
+  @keyframes pop { 0% { opacity: 0; transform: translate(-50%,-50%) scale(.4); } 20% { opacity: 1; transform: translate(-50%,-50%) scale(1.15); }
+                   70% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-90%) scale(1); } }
+
+  /* ---- Kontroller ---- */
+  #controls { flex: none; display: grid; grid-template-columns: 1fr 1fr 1fr 1.3fr 1fr; gap: 8px; }
+  #controls button {
+    height: 64px; border-radius: 20px; font-size: 28px; font-weight: 900;
+    background: linear-gradient(#6f5bd6, #4b37b0); box-shadow: 0 5px 0 #2c1f78, 0 8px 14px rgba(0,0,0,.35);
+    transition: transform .05s, box-shadow .05s;
+  }
+  #controls button:active, #controls button.down { transform: translateY(4px); box-shadow: 0 1px 0 #2c1f78; }
+  #controls [data-act=rotate] { background: linear-gradient(#ffb347, #ff7a1a); box-shadow: 0 5px 0 #a24b08, 0 8px 14px rgba(0,0,0,.35); }
+  #controls [data-act=rotate]:active { box-shadow: 0 1px 0 #a24b08; }
+  #controls [data-act=drop] { background: linear-gradient(#ff6b8b, #e0245e); box-shadow: 0 5px 0 #8c1038, 0 8px 14px rgba(0,0,0,.35); }
+  #controls [data-act=drop]:active { box-shadow: 0 1px 0 #8c1038; }
+
+  /* ---- Katmanlar ---- */
+  .layer { position: fixed; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center;
+           background: rgba(15,10,42,.78); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+           padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom); }
+  .layer.show { display: flex; }
+  .card { width: min(100%, 420px); max-height: 100%; overflow: auto; box-sizing: border-box; text-align: center;
+          background: linear-gradient(#3a2a8f, #28196e); border-radius: 28px; padding: 22px 20px;
+          box-shadow: 0 20px 60px rgba(0,0,0,.6), 0 0 0 3px rgba(255,255,255,.2); }
+  .card h1 { margin: 6px 0 2px; font-size: 34px; line-height: 1.05; text-shadow: 0 3px 0 #7a3cff; }
+  .card p { margin: 6px 0 14px; opacity: .85; font-size: 16px; }
+  .bigface { width: 130px; height: 130px; margin: 0 auto 4px; border-radius: 50%; overflow: hidden;
+             background: rgba(255,255,255,.12); box-shadow: 0 0 0 4px rgba(255,255,255,.35); }
+  .bigface svg, .bigface img { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .btn { display: block; width: 100%; margin: 10px 0 0; padding: 15px; border-radius: 20px; font-size: 22px; font-weight: 900;
+         background: linear-gradient(#5be37d, #1fb64a); box-shadow: 0 5px 0 #0e7a2e; }
+  .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #0e7a2e; }
+  .btn.alt { background: rgba(255,255,255,.16); box-shadow: none; font-size: 17px; padding: 12px; }
+
+  #settings .row { text-align: left; margin: 12px 0 0; }
+  #settings label.t { display: block; font-size: 13px; font-weight: 800; letter-spacing: .05em; opacity: .8; margin-bottom: 6px; }
+  #settings input[type=text] { width: 100%; box-sizing: border-box; font: inherit; font-size: 20px; padding: 10px 12px; border-radius: 14px; border: 0; outline: 0; }
+  .sw { display: flex; flex-wrap: wrap; gap: 10px; }
+  .sw button { width: 40px; height: 40px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,.3); }
+  .sw button.on { box-shadow: 0 0 0 4px #fff; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button { padding: 9px 14px; border-radius: 14px; background: rgba(255,255,255,.14); font-weight: 800; font-size: 15px; }
+  .chips button.on { background: #fff; color: #2a1d6a; }
+  #settings small.hint { display: block; margin-top: 6px; opacity: .7; font-size: 12px; }
+  #photoIn { display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <div id="mascot"><div id="face"></div><span id="badge"></span></div>
+    <div id="stats">
+      <div class="stat"><small>PUAN</small><b id="score">0</b></div>
+      <div class="stat"><small>SEVİYE</small><b id="level">1</b></div>
+      <div class="stat"><small>SATIR</small><b id="lines">0</b></div>
+      <div class="stat" id="hi"><small>🏆 REKOR</small><b id="high">0</b></div>
+    </div>
+    <div id="nextWrap"><canvas id="next" width="72" height="72"></canvas></div>
+    <button id="pauseBtn" aria-label="Duraklat">⏸</button>
+  </div>
+
+  <div id="boardWrap">
+    <canvas id="board"></canvas>
+    <div id="bubble"></div>
+    <div id="toast"></div>
+  </div>
+
+  <div id="controls">
+    <button data-act="left" aria-label="Sol">◀</button>
+    <button data-act="down" aria-label="Aşağı">▼</button>
+    <button data-act="right" aria-label="Sağ">▶</button>
+    <button data-act="rotate" aria-label="Döndür">⟳</button>
+    <button data-act="drop" aria-label="Hızlı düşür">⏬</button>
+  </div>
+</div>
+
+<!-- Ana menü / duraklat / oyun bitti -->
+<div id="overlay" class="layer"><div class="card">
+  <div class="bigface" id="ovFace"></div>
+  <h1 id="ovTitle"></h1>
+  <p id="ovSub"></p>
+  <div id="ovBtns"></div>
+</div></div>
+
+<!-- Ayarlar -->
+<div id="settings" class="layer"><div class="card">
+  <h1 style="font-size:28px">Ayarlar</h1>
+  <div class="bigface" id="setFace" style="width:96px;height:96px;margin-top:10px"></div>
+
+  <div class="row"><label class="t">İSİM</label><input id="setName" type="text" maxlength="12" autocomplete="off"></div>
+  <div class="row"><label class="t">TEN RENGİ</label><div class="sw" id="swSkin"></div></div>
+  <div class="row"><label class="t">SAÇ RENGİ</label><div class="sw" id="swHair"></div></div>
+  <div class="row"><label class="t">SAÇ MODELİ</label><div class="chips" id="chStyle"></div></div>
+  <div class="row"><label class="t">DİĞER</label><div class="chips" id="chGlasses"></div></div>
+
+  <div class="row"><label class="t">KENDİ KARİKATÜRÜ</label>
+    <div class="chips">
+      <button id="photoBtn">📷 Resim seç</button>
+      <button id="photoClear">Çizgi karakteri kullan</button>
+    </div>
+    <small class="hint">Seçilen resim sadece bu cihazda saklanır, hiçbir yere gönderilmez.</small>
+    <input id="photoIn" type="file" accept="image/*">
+  </div>
+
+  <div class="row"><label class="t">OYUN</label>
+    <div class="chips" id="chGame"></div>
+    <small class="hint">Kolay mod: yavaş başlar, yığın dolunca oyun bitmez, üst kısım temizlenir.</small>
+  </div>
+  <button class="btn" id="setDone">Tamam</button>
+</div></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= Sabitler ================= */
+const COLS = 10, ROWS = 20;
+const COLORS = { I:'#22d3ee', O:'#fde047', T:'#c084fc', S:'#4ade80', Z:'#f87171', J:'#60a5fa', L:'#fb923c' };
+const SHAPES = {
+  I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+  O:[[1,1],[1,1]],
+  T:[[0,1,0],[1,1,1],[0,0,0]],
+  S:[[0,1,1],[1,1,0],[0,0,0]],
+  Z:[[1,1,0],[0,1,1],[0,0,0]],
+  J:[[1,0,0],[1,1,1],[0,0,0]],
+  L:[[0,0,1],[1,1,1],[0,0,0]],
+};
+const KICKS = [[0,0],[-1,0],[1,0],[-2,0],[2,0],[0,-1],[-1,-1],[1,-1]];
+const SKINS = ['#ffe0c2', '#f5c9a0', '#e0a878', '#b9774a', '#8a5535'];
+const HAIRS = ['#2b1a12', '#5a3a22', '#9a6a3a', '#d9a441', '#c2461f', '#6b6b6b'];
+const STYLES = { short:'Kısa', spiky:'Dikenli', curly:'Kıvırcık' };
+const BADGES = { idle:'', happy:'😄', cheer:'🎉', wow:'😮', worried:'😰' };
+
+/* ================= Ayarlar ================= */
+const DEFAULTS = { name:'Cem', skin:SKINS[1], hair:HAIRS[1], style:'short', glasses:false, easy:true, sound:true, photo:null };
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+const settings = Object.assign({}, DEFAULTS, store.get('cemtetris.settings', {}));
+const saveSettings = () => store.set('cemtetris.settings', settings);
+
+/* ================= Çizgi karakter (SVG) ================= */
+function avatarSVG(mood, s) {
+  const hair = s.hair, skin = s.skin, ink = '#2a1d1d';
+  let back = '', top = '';
+  if (s.style === 'curly') {
+    back = [[26,40],[36,28],[50,23],[64,28],[74,40],[22,54],[78,54]]
+      .map(([x,y]) => `<circle cx="${x}" cy="${y}" r="13" fill="${hair}"/>`).join('');
+    top = `<path d="M24 50 C28 34 40 30 50 33 C60 30 72 34 76 50 C66 40 34 40 24 50Z" fill="${hair}"/>`;
+  } else if (s.style === 'spiky') {
+    top = `<polygon points="19,54 17,30 31,38 35,13 48,31 59,9 65,32 79,19 81,54 71,42 50,37 30,42" fill="${hair}"/>`;
+  } else {
+    top = `<path d="M19 54 C15 22 38 12 52 13 C72 13 85 28 81 54 C75 40 64 34 50 35 C36 36 25 41 19 54Z" fill="${hair}"/>`;
+  }
+  const ears = `<circle cx="20" cy="58" r="7" fill="${skin}"/><circle cx="80" cy="58" r="7" fill="${skin}"/>`;
+  const head = `<circle cx="50" cy="56" r="30" fill="${skin}"/>`;
+  const cheeks = `<circle cx="30" cy="68" r="5" fill="#ff8a98" opacity=".45"/><circle cx="70" cy="68" r="5" fill="#ff8a98" opacity=".45"/>`;
+
+  const eyeOpen = (x, r = 6.5) =>
+    `<ellipse cx="${x}" cy="56" rx="${r}" ry="${r + 1}" fill="#fff"/><circle cx="${x}" cy="57" r="3.6" fill="${ink}"/><circle cx="${x + 1.3}" cy="55.6" r="1.2" fill="#fff"/>`;
+  const eyeArc = x => `<path d="M${x - 6} 58 Q${x} 49 ${x + 6} 58" stroke="${ink}" stroke-width="3.2" fill="none" stroke-linecap="round"/>`;
+
+  let eyes, mouth, extra = '';
+  if (mood === 'happy' || mood === 'cheer') {
+    eyes = eyeArc(38) + eyeArc(62);
+    mouth = `<path d="M37 67 Q50 90 63 67 Z" fill="#7a1f2b" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>
+             <path d="M43 77 Q50 72 57 77 Q50 84 43 77Z" fill="#ff7d8f"/>`;
+  } else if (mood === 'wow') {
+    eyes = eyeOpen(38, 8) + eyeOpen(62, 8);
+    mouth = `<ellipse cx="50" cy="75" rx="5.5" ry="7.5" fill="#7a1f2b" stroke="${ink}" stroke-width="2"/>`;
+    extra = `<path d="M30 42 Q38 36 46 42 M54 42 Q62 36 70 42" stroke="${ink}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+  } else if (mood === 'worried') {
+    eyes = eyeOpen(38) + eyeOpen(62);
+    mouth = `<path d="M41 77 Q45 72 50 76 Q55 72 59 77" stroke="${ink}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+    extra = `<path d="M31 47 L45 43 M55 43 L69 47" stroke="${ink}" stroke-width="2.8" stroke-linecap="round"/>
+             <path d="M80 34 Q86 44 80 48 Q74 44 80 34Z" fill="#7fd4ff"/>`;
+  } else {
+    eyes = eyeOpen(38) + eyeOpen(62);
+    mouth = `<path d="M40 70 Q50 79 60 70" stroke="${ink}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+  }
+  const glasses = s.glasses
+    ? `<circle cx="38" cy="56" r="11.5" fill="#fff" fill-opacity=".22" stroke="#222" stroke-width="2.6"/>
+       <circle cx="62" cy="56" r="11.5" fill="#fff" fill-opacity=".22" stroke="#222" stroke-width="2.6"/>
+       <path d="M49.5 55 H50.5" stroke="#222" stroke-width="2.6"/>`
+    : '';
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">${back}${ears}${head}${top}${cheeks}${eyes}${extra}${mouth}${glasses}</svg>`;
+}
+
+function renderFace(el, mood) {
+  if (settings.photo) {
+    el.textContent = '';
+    const img = new Image();
+    img.src = settings.photo; img.alt = '';
+    el.appendChild(img);
+  } else {
+    el.innerHTML = avatarSVG(mood, settings);
+  }
+}
+
+/* ================= Ses ================= */
+let actx = null;
+function unlockAudio() {
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+  } catch (e) { actx = null; }
+}
+function tone(freq, start, dur, type = 'sine', vol = .15) {
+  if (!actx || !settings.sound) return;
+  const t = actx.currentTime + start;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + .01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(actx.destination);
+  o.start(t); o.stop(t + dur + .02);
+}
+const sfx = {
+  move()   { tone(300, 0, .04, 'triangle', .07); },
+  rotate() { tone(520, 0, .06, 'triangle', .1); },
+  lock()   { tone(140, 0, .09, 'square', .08); },
+  clear(n) { [523, 659, 784, 1047].slice(0, Math.max(2, n + 1)).forEach((f, i) => tone(f, i * .07, .16, 'triangle', .16)); },
+  level()  { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i * .08, .2, 'square', .09)); },
+  over()   { [392, 330, 262, 196].forEach((f, i) => tone(f, i * .18, .3, 'sawtooth', .08)); },
+};
+
+/* ================= Oyun durumu ================= */
+const boardCv = document.getElementById('board');
+const ctx = boardCv.getContext('2d');
+const nextCv = document.getElementById('next');
+const nctx = nextCv.getContext('2d');
+
+let board, cur, nextType, bag = [];
+let score = 0, lines = 0, level = 1, high = store.get('cemtetris.high', 0);
+let state = 'menu';            // menu | playing | paused | clearing | over
+let dropAcc = 0, lockAcc = 0, lockResets = 0;
+let clearRows = [], clearT = 0;
+let particles = [];
+let cell = 20, dpr = 1;
+
+const $ = id => document.getElementById(id);
+const rotateCW = m => m.map((_, r) => m.map((__, c) => m[m.length - 1 - c][r]));
+
+function newBoard() { return Array.from({ length: ROWS }, () => Array(COLS).fill(0)); }
+function takeType() {
+  if (!bag.length) {
+    bag = Object.keys(SHAPES);
+    for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+  }
+  return bag.pop();
+}
+function collides(m, x, y) {
+  for (let r = 0; r < m.length; r++) for (let c = 0; c < m[r].length; c++) {
+    if (!m[r][c]) continue;
+    const bx = x + c, by = y + r;
+    if (bx < 0 || bx >= COLS || by >= ROWS) return true;
+    if (by >= 0 && board[by][bx]) return true;
+  }
+  return false;
+}
+const speed = () => settings.easy ? Math.max(180, 950 - 70 * (level - 1)) : Math.max(100, 700 - 65 * (level - 1));
+const lockDelay = () => settings.easy ? 700 : 450;
+
+function spawn() {
+  const type = nextType || takeType();
+  nextType = takeType();
+  const m = SHAPES[type].map(r => r.slice());
+  cur = { type, m, x: Math.floor((COLS - m.length) / 2), y: type === 'I' ? -1 : 0 };
+  dropAcc = 0; lockAcc = 0; lockResets = 0;
+  drawNext();
+  if (collides(cur.m, cur.x, cur.y)) {
+    topOut();
+    while (state !== 'over' && collides(cur.m, cur.x, cur.y)) cur.y -= 1;
+  }
+}
+
+function topOut() {
+  if (settings.easy) {
+    for (let r = 0; r < 9; r++) board[r].fill(0);
+    spawnConfetti(30, 6);
+    toast(`${settings.name} kurtardı!`);
+    setMood('cheer', 'Devam ediyoruz!', 2200);
+    sfx.level();
+  } else {
+    gameOver();
+  }
+}
+
+function tryMove(dx, dy) {
+  if (collides(cur.m, cur.x + dx, cur.y + dy)) return false;
+  cur.x += dx; cur.y += dy;
+  if (dx !== 0 && lockAcc > 0 && lockResets < 15) { lockAcc = 0; lockResets++; }
+  return true;
+}
+function tryRotate() {
+  const m = rotateCW(cur.m);
+  for (const [dx, dy] of KICKS) {
+    if (!collides(m, cur.x + dx, cur.y + dy)) {
+      cur.m = m; cur.x += dx; cur.y += dy;
+      if (lockAcc > 0 && lockResets < 15) { lockAcc = 0; lockResets++; }
+      sfx.rotate();
+      return true;
+    }
+  }
+  return false;
+}
+function softDrop() { if (tryMove(0, 1)) { score += 1; dropAcc = 0; updateHud(); } }
+function hardDrop() {
+  let n = 0;
+  while (tryMove(0, 1)) n++;
+  score += 2 * n; updateHud();
+  lockPiece();
+}
+
+function lockPiece() {
+  let above = false;
+  cur.m.forEach((row, r) => row.forEach((v, c) => {
+    if (!v) return;
+    const by = cur.y + r, bx = cur.x + c;
+    if (by < 0) above = true; else board[by][bx] = cur.type;
+  }));
+  sfx.lock();
+  if (above) { cur = null; if (settings.easy) { topOut(); spawn(); } else gameOver(); return; }
+
+  const full = [];
+  for (let r = 0; r < ROWS; r++) if (board[r].every(v => v)) full.push(r);
+  if (!full.length) {
+    cur = null;
+    spawn();
+    checkDanger();
+    return;
+  }
+  clearRows = full; clearT = 0; state = 'clearing'; cur = null;
+  spawnConfetti(full.length * 14, full[0]);
+  sfx.clear(full.length);
+  if (full.length >= 4) { toast('TETRİS!'); setMood('cheer', `Harika ${settings.name}!`, 2200); }
+  else if (full.length >= 2) { toast(['', '', 'Süper!', 'Müthiş!'][full.length]); setMood('happy', 'Yaşasın!', 1600); }
+  else setMood('happy', ['Aferin!', 'Güzel!', 'Bravo!'][Math.floor(Math.random() * 3)], 1400);
+}
+
+function finishClear() {
+  const n = clearRows.length;
+  for (const r of clearRows.slice().sort((a, b) => a - b)) { board.splice(r, 1); board.unshift(Array(COLS).fill(0)); }
+  score += [0, 100, 300, 500, 800][n] * level;
+  lines += n;
+  const newLevel = 1 + Math.floor(lines / 10);
+  if (newLevel > level) {
+    level = newLevel;
+    toast(`Seviye ${level}!`);
+    setMood('wow', 'Seviye atladık!', 2000);
+    spawnConfetti(60, 4);
+    sfx.level();
+  }
+  clearRows = [];
+  updateHud();
+  state = 'playing';
+  spawn();
+}
+
+let dangerShown = false;
+function checkDanger() {
+  let top = ROWS;
+  for (let r = 0; r < ROWS; r++) if (board[r].some(v => v)) { top = r; break; }
+  if (top <= 5 && !dangerShown) { dangerShown = true; setMood('worried', 'Dikkat!', 2400); }
+  if (top > 8) dangerShown = false;
+}
+
+function gameOver() {
+  state = 'over'; cur = null;
+  const record = score > high;
+  if (record) { high = score; store.set('cemtetris.high', high); }
+  updateHud();
+  sfx.over();
+  setMood('worried', 'Olsun!', 3000);
+  showGameOver(record);
+}
+function showGameOver(record) {
+  showOverlay({
+    mood: record ? 'cheer' : 'worried',
+    title: record ? 'Yeni rekor!' : 'Oyun bitti',
+    sub: `${score} puan • ${lines} satır` + (record ? ' 🏆' : ''),
+    buttons: [{ label: 'Tekrar oyna', fn: startGame }, { label: '⚙︎ Ayarlar', fn: openSettings, alt: true }],
+  });
+}
+
+function startGame() {
+  unlockAudio();
+  board = newBoard(); bag = []; nextType = null;
+  score = 0; lines = 0; level = 1; particles = []; clearRows = []; dangerShown = false;
+  hideOverlay();
+  state = 'playing';
+  updateHud();
+  spawn();
+  setMood('happy', `Hadi ${settings.name}!`, 1600);
+}
+
+function pause() {
+  if (state !== 'playing' && state !== 'clearing') return;
+  prePauseState = state; state = 'paused';
+  showPause();
+}
+function showPause() {
+  showOverlay({
+    mood: 'idle', title: 'Mola', sub: 'Hazır olunca devam et.',
+    buttons: [
+      { label: 'Devam', fn: resume },
+      { label: '⚙︎ Ayarlar', fn: openSettings, alt: true },
+      { label: 'Yeniden başla', fn: startGame, alt: true },
+    ],
+  });
+}
+let prePauseState = 'playing';
+function resume() { unlockAudio(); hideOverlay(); state = prePauseState; }
+
+/* ================= Arayüz ================= */
+function updateHud() {
+  $('score').textContent = score;
+  $('level').textContent = level;
+  $('lines').textContent = lines;
+  $('high').textContent = Math.max(high, score);
+}
+
+let moodTimer = 0;
+function setMood(mood, text, ms = 1800) {
+  const m = $('mascot');
+  m.className = ''; void m.offsetWidth; m.className = 'mood-' + mood;
+  renderFace($('face'), mood);
+  $('badge').textContent = settings.photo ? BADGES[mood] : '';
+  if (text) { const b = $('bubble'); b.textContent = text; b.classList.add('show'); }
+  clearTimeout(moodTimer);
+  moodTimer = setTimeout(() => {
+    $('bubble').classList.remove('show');
+    const calm = (dangerShown && state !== 'menu') ? 'worried' : 'idle';
+    m.className = 'mood-' + calm;
+    renderFace($('face'), calm);
+    $('badge').textContent = settings.photo ? BADGES[calm] : '';
+  }, ms);
+}
+
+let toastTimer = 0;
+function toast(text) {
+  const t = $('toast');
+  t.textContent = text;
+  t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1250);
+}
+
+function showOverlay({ mood = 'idle', title, sub, buttons }) {
+  renderFace($('ovFace'), mood);
+  $('ovTitle').textContent = title;
+  $('ovSub').textContent = sub;
+  const box = $('ovBtns'); box.textContent = '';
+  for (const b of buttons) {
+    const el = document.createElement('button');
+    el.className = 'btn' + (b.alt ? ' alt' : '');
+    el.textContent = b.label;
+    el.addEventListener('click', b.fn);
+    box.appendChild(el);
+  }
+  $('overlay').classList.add('show');
+}
+function hideOverlay() { $('overlay').classList.remove('show'); }
+
+function showMenu() {
+  state = 'menu';
+  showOverlay({
+    mood: 'happy',
+    title: `${settings.name} Tetris`,
+    sub: high ? `Rekor: ${high}` : 'Satırları doldur, bulmacayı çöz!',
+    buttons: [{ label: '▶ Başla', fn: startGame }, { label: '⚙︎ Ayarlar', fn: openSettings, alt: true }],
+  });
+}
+
+/* ================= Ayarlar paneli ================= */
+function buildSettings() {
+  const swatches = (host, list, key) => {
+    host.textContent = '';
+    list.forEach(color => {
+      const b = document.createElement('button');
+      b.style.background = color;
+      b.setAttribute('aria-label', color);
+      if (settings[key] === color) b.classList.add('on');
+      b.addEventListener('click', () => { settings[key] = color; applySettings(); buildSettings(); });
+      host.appendChild(b);
+    });
+  };
+  const chips = (host, items) => {
+    host.textContent = '';
+    items.forEach(([label, on, fn]) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      if (on) b.classList.add('on');
+      b.addEventListener('click', () => { fn(); applySettings(); buildSettings(); });
+      host.appendChild(b);
+    });
+  };
+  swatches($('swSkin'), SKINS, 'skin');
+  swatches($('swHair'), HAIRS, 'hair');
+  chips($('chStyle'), Object.entries(STYLES).map(([k, label]) => [label, settings.style === k, () => { settings.style = k; }]));
+  chips($('chGlasses'), [['👓 Gözlük', settings.glasses, () => { settings.glasses = !settings.glasses; }]]);
+  chips($('chGame'), [
+    ['🌱 Kolay mod', settings.easy, () => { settings.easy = !settings.easy; }],
+    ['🔊 Ses', settings.sound, () => { settings.sound = !settings.sound; unlockAudio(); if (settings.sound) sfx.rotate(); }],
+  ]);
+  $('setName').value = settings.name;
+}
+function applySettings() {
+  saveSettings();
+  renderFace($('setFace'), 'happy');
+  renderFace($('face'), 'idle');
+  $('badge').textContent = '';
+}
+function openSettings() {
+  if (state === 'playing' || state === 'clearing') pause();
+  buildSettings(); applySettings();
+  $('overlay').classList.remove('show');
+  $('settings').classList.add('show');
+}
+function closeSettings() {
+  $('settings').classList.remove('show');
+  if (state === 'menu') showMenu();
+  else if (state === 'paused') showPause();
+  else if (state === 'over') showGameOver(false);
+}
+
+$('setName').addEventListener('input', e => { settings.name = e.target.value.trim() || 'Cem'; saveSettings(); });
+$('setDone').addEventListener('click', closeSettings);
+$('photoBtn').addEventListener('click', () => $('photoIn').click());
+$('photoClear').addEventListener('click', () => { settings.photo = null; applySettings(); });
+$('photoIn').addEventListener('change', e => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    const S = 256, cv = document.createElement('canvas');
+    cv.width = cv.height = S;
+    const side = Math.min(img.width, img.height);
+    cv.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, S, S);
+    settings.photo = cv.toDataURL('image/jpeg', .85);
+    URL.revokeObjectURL(url);
+    applySettings();
+  };
+  img.src = url;
+  e.target.value = '';
+});
+
+/* ================= Çizim ================= */
+function fit() {
+  const wrap = $('boardWrap');
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  cell = Math.max(10, Math.floor(Math.min(w / COLS, h / ROWS)));
+  dpr = Math.min(window.devicePixelRatio || 1, 3);
+  boardCv.style.width = cell * COLS + 'px';
+  boardCv.style.height = cell * ROWS + 'px';
+  boardCv.width = cell * COLS * dpr;
+  boardCv.height = cell * ROWS * dpr;
+  if (nextType) drawNext();
+}
+
+function rr(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+function drawCell(c, px, py, size, color, alpha = 1) {
+  const pad = Math.max(1, size * .06), s = size - pad * 2, r = size * .22;
+  c.globalAlpha = alpha;
+  rr(c, px + pad, py + pad, s, s, r); c.fillStyle = color; c.fill();
+  rr(c, px + pad + s * .12, py + pad + s * .08, s * .76, s * .36, r * .8);
+  c.fillStyle = 'rgba(255,255,255,.28)'; c.fill();
+  rr(c, px + pad, py + pad + s * .62, s, s * .38, r);
+  c.fillStyle = 'rgba(0,0,0,.14)'; c.fill();
+  c.globalAlpha = 1;
+}
+
+function ghostY() { let y = cur.y; while (!collides(cur.m, cur.x, y + 1)) y++; return y; }
+
+function render() {
+  const W = COLS * cell, H = ROWS * cell;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#2b1f6e'); g.addColorStop(1, '#171046');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.lineWidth = 1; ctx.beginPath();
+  for (let c = 1; c < COLS; c++) { ctx.moveTo(c * cell + .5, 0); ctx.lineTo(c * cell + .5, H); }
+  for (let r = 1; r < ROWS; r++) { ctx.moveTo(0, r * cell + .5); ctx.lineTo(W, r * cell + .5); }
+  ctx.stroke();
+  if (!board) return;
+
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
+    if (board[r][c]) drawCell(ctx, c * cell, r * cell, cell, COLORS[board[r][c]]);
+
+  if (state === 'clearing') {
+    const on = Math.floor(clearT / 70) % 2 === 0;
+    ctx.fillStyle = on ? 'rgba(255,255,255,.92)' : 'rgba(255,255,255,.35)';
+    for (const r of clearRows) ctx.fillRect(0, r * cell, W, cell);
+  }
+
+  if (cur && (state === 'playing' || state === 'paused')) {
+    const gy = ghostY();
+    cur.m.forEach((row, r) => row.forEach((v, c) => {
+      if (v && gy + r >= 0) {
+        ctx.globalAlpha = .28; ctx.fillStyle = COLORS[cur.type];
+        rr(ctx, (cur.x + c) * cell + 2, (gy + r) * cell + 2, cell - 4, cell - 4, cell * .2); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }));
+    cur.m.forEach((row, r) => row.forEach((v, c) => {
+      if (v && cur.y + r >= 0) drawCell(ctx, (cur.x + c) * cell, (cur.y + r) * cell, cell, COLORS[cur.type]);
+    }));
+  }
+
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+    ctx.fillStyle = p.color;
+    ctx.save(); ctx.translate(p.x * cell, p.y * cell); ctx.rotate(p.rot);
+    ctx.fillRect(-cell * .12, -cell * .12, cell * .24, cell * .24);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawNext() {
+  nctx.clearRect(0, 0, 72, 72);
+  if (!nextType) return;
+  const m = SHAPES[nextType], s = 16;
+  let minR = 9, maxR = -1, minC = 9, maxC = -1;
+  m.forEach((row, r) => row.forEach((v, c) => { if (v) { minR = Math.min(minR, r); maxR = Math.max(maxR, r); minC = Math.min(minC, c); maxC = Math.max(maxC, c); } }));
+  const ox = (72 - (maxC - minC + 1) * s) / 2, oy = (72 - (maxR - minR + 1) * s) / 2;
+  m.forEach((row, r) => row.forEach((v, c) => { if (v) drawCell(nctx, ox + (c - minC) * s, oy + (r - minR) * s, s, COLORS[nextType]); }));
+}
+
+function spawnConfetti(n, rowCenter) {
+  const cols = Object.values(COLORS);
+  for (let i = 0; i < n; i++) particles.push({
+    x: Math.random() * COLS, y: rowCenter + Math.random() * 2,
+    vx: (Math.random() - .5) * 8, vy: -Math.random() * 9 - 2,
+    rot: Math.random() * 6, vr: (Math.random() - .5) * 12,
+    color: cols[Math.floor(Math.random() * cols.length)], life: 1.2,
+  });
+}
+
+/* ================= Ana döngü ================= */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(100, now - last); last = now;
+
+  if (state === 'playing' && cur) {
+    dropAcc += dt;
+    const iv = speed();
+    while (dropAcc >= iv) {
+      dropAcc -= iv;
+      if (!tryMove(0, 1)) { dropAcc = 0; break; }
+    }
+    if (collides(cur.m, cur.x, cur.y + 1)) {
+      lockAcc += dt;
+      if (lockAcc >= lockDelay()) lockPiece();
+    } else lockAcc = 0;
+  } else if (state === 'clearing') {
+    clearT += dt;
+    if (clearT >= 320) finishClear();
+  }
+
+  const s = dt / 1000;
+  for (const p of particles) { p.vy += 18 * s; p.x += p.vx * s; p.y += p.vy * s; p.rot += p.vr * s; p.life -= s * .7; }
+  particles = particles.filter(p => p.life > 0 && p.y < ROWS + 2);
+
+  render();
+  requestAnimationFrame(frame);
+}
+
+/* ================= Kontroller ================= */
+const ACTIONS = {
+  left()   { if (tryMove(-1, 0)) sfx.move(); },
+  right()  { if (tryMove(1, 0)) sfx.move(); },
+  down()   { softDrop(); },
+  rotate() { tryRotate(); },
+  drop()   { hardDrop(); },
+};
+const REPEAT = { left: 1, right: 1, down: 1 };
+const canPlay = () => state === 'playing' && cur;
+
+document.querySelectorAll('#controls button').forEach(btn => {
+  const act = btn.dataset.act;
+  let delay = 0, iv = 0;
+  const stop = () => { clearTimeout(delay); clearInterval(iv); btn.classList.remove('down'); };
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    unlockAudio();
+    btn.classList.add('down');
+    if (canPlay()) ACTIONS[act]();
+    if (REPEAT[act]) {
+      delay = setTimeout(() => { iv = setInterval(() => { if (canPlay()) ACTIONS[act](); }, 70); }, 190);
+    }
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => btn.addEventListener(ev, stop));
+  btn.addEventListener('contextmenu', e => e.preventDefault());
+});
+
+// Tahtada kaydırma: yana sürükle = hareket, dokun = döndür, aşağı sürükle = hızlı in
+(() => {
+  let id = null, sx = 0, sy = 0, st = 0, ax = 0, ay = 0, moved = false;
+  boardCv.addEventListener('pointerdown', e => {
+    e.preventDefault(); unlockAudio();
+    id = e.pointerId; boardCv.setPointerCapture(id);
+    sx = e.clientX; sy = e.clientY; st = performance.now(); ax = 0; ay = 0; moved = false;
+  });
+  boardCv.addEventListener('pointermove', e => {
+    if (e.pointerId !== id || !canPlay()) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    sx = e.clientX; sy = e.clientY;
+    ax += dx; ay += dy;
+    if (Math.abs(ax) > cell * .9) moved = true;
+    while (ax >= cell) { ACTIONS.right(); ax -= cell; moved = true; }
+    while (ax <= -cell) { ACTIONS.left(); ax += cell; moved = true; }
+    while (ay >= cell) { ACTIONS.down(); ay -= cell; moved = true; }
+    if (ay < 0) ay = 0;
+  });
+  const end = e => {
+    if (e.pointerId !== id) return;
+    const dt = performance.now() - st;
+    id = null;
+    if (!canPlay()) return;
+    if (!moved && dt < 300) ACTIONS.rotate();
+  };
+  boardCv.addEventListener('pointerup', end);
+  boardCv.addEventListener('pointercancel', () => { id = null; });
+  boardCv.addEventListener('contextmenu', e => e.preventDefault());
+})();
+
+// Klavye (bilgisayarda deneme için)
+window.addEventListener('keydown', e => {
+  const k = e.key;
+  if (k === 'p' || k === 'P' || k === 'Escape') { if (state === 'paused') resume(); else pause(); return; }
+  if (!canPlay()) return;
+  const map = { ArrowLeft: 'left', ArrowRight: 'right', ArrowDown: 'down', ArrowUp: 'rotate', ' ': 'drop' };
+  if (map[k]) { e.preventDefault(); ACTIONS[map[k]](); }
+});
+
+$('pauseBtn').addEventListener('click', () => { unlockAudio(); if (state === 'paused') resume(); else pause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+window.addEventListener('resize', fit);
+window.addEventListener('orientationchange', () => setTimeout(fit, 200));
+// iOS'ta sayfanın kayması / çift dokunma ile yakınlaşma olmasın
+document.addEventListener('touchmove', e => { if (e.target.closest('.card')) return; e.preventDefault(); }, { passive: false });
+document.addEventListener('gesturestart', e => e.preventDefault());
+
+/* ================= Başlangıç ================= */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+board = newBoard();
+renderFace($('face'), 'idle');
+updateHud();
+fit();
+showMenu();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
