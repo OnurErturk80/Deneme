@@ -15,5 +15,10 @@ iPhone/iPad için tasarlanmış, tek sayfalık Tetris oyunu. Kurulum veya uygula
 Oyun içinde ⚙︎ Ayarlar: isim, ten ve saç rengi, saç modeli, gözlük, kolay mod, ses.
 "Resim seç" ile kendi hazırladığınız karikatür kullanılabilir; resim yalnızca cihazda saklanır.
 
+## Ses ve müzik
+- Arka plan müziği oyun içinde üretilir (dosya yok), seviye arttıkça hızlanır.
+- Cem'in sesi: ⚙︎ Ayarlar → "Cem'in sesi" bölümünden her cümle için 🎤 ile kendi sesinizi kaydedebilirsiniz.
+  Kayıt yoksa cihazın Türkçe sesi çocuk tonuyla okur. Kayıtlar yalnızca cihazda saklanır.
+
 ## Bilgisayarda denemek
 Ok tuşları hareket/döndürme, boşluk hızlı bırak, P mola.
