@@ -281,6 +281,8 @@ function renderFace(el, mood) {
 let actx = null, masterMusic = null, silentEl = null;
 function unlockAudio() {
   try {
+    // iOS 16.4+: sessiz düğmesi açıkken de ses çalsın
+    if (navigator.audioSession) navigator.audioSession.type = 'playback';
     if (!actx) {
       actx = new (window.AudioContext || window.webkitAudioContext)();
       masterMusic = actx.createGain();
@@ -291,11 +293,11 @@ function unlockAudio() {
     keepAudioAlive();
   } catch (e) { actx = null; }
 }
-// iOS'ta sessiz düğmesi açıkken de ses çıksın diye çok kısık, sessiz bir ses çalınır
+// Eski iOS'ta sessiz düğmesi açıkken de ses çıksın diye çok kısık, sessiz bir ses çalınır
 function keepAudioAlive() {
   try {
     if (!silentEl) {
-      const n = 800, b = new Uint8Array(44 + n), v = new DataView(b.buffer);
+      const n = 16000, b = new Uint8Array(44 + n), v = new DataView(b.buffer);
       const w = (o, t) => [...t].forEach((c, i) => { b[o + i] = c.charCodeAt(0); });
       w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true);
       v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true);
@@ -732,6 +734,7 @@ function buildSettings() {
   chips($('chGame'), [
     ['🌱 Kolay mod', settings.easy, () => { settings.easy = !settings.easy; }],
     ['🔊 Ses', settings.sound, () => { settings.sound = !settings.sound; unlockAudio(); if (settings.sound) sfx.rotate(); else music.stop(); }],
+    ['🔔 Sesi dene', false, () => { unlockAudio(); sfx.level(); say('start', `Hadi ${settings.name}!`, true); }],
     ['🎵 Müzik', settings.music, () => { settings.music = !settings.music; if (!settings.music) music.stop(); }],
     ['🗣️ Cem konuşsun', settings.voice, () => { settings.voice = !settings.voice; unlockAudio(); if (settings.voice) say('start', `Hadi ${settings.name}!`, true); }],
   ]);
@@ -988,6 +991,8 @@ window.addEventListener('keydown', e => {
 
 $('pauseBtn').addEventListener('click', () => { unlockAudio(); if (state === 'paused') resume(); else pause(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+// iOS ses kilidini ancak dokunma bitişi / tıklama açar
+['touchend', 'click'].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
 window.addEventListener('resize', fit);
 window.addEventListener('orientationchange', () => setTimeout(fit, 200));
 // iOS'ta sayfanın kayması / çift dokunma ile yakınlaşma olmasın
